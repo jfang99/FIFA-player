@@ -1,0 +1,469 @@
+---
+title: "FIFA"
+author: "Jingfei"
+date: "3/5/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(corrplot)
+library(car)
+library(leaps)
+library(ggplot2)
+```
+
+```{r}
+train <- read.csv('Train_FIFA.csv')
+test <- read.csv('Test_FIFA.csv')
+```
+
+```{r}
+train_num<- train[,sapply(train, is.numeric)]
+train_num$Ob <- NULL
+cordata <- round(cor(train_num, use = "pairwise.complete.obs"), 4)
+#pdf(file = "yourfilename.pdf")
+corrplot(cordata, order = "AOE", method = "circle", cl.cex = 0.5, tl.cex=0.5)
+#dev.off()
+```
+
+```{r}
+#scatterplotMatrix(~WageNew + Overall+Potential+Reactions+Composure+BallControl+
+             #ShortPassing+Vision+LongShots, data=train)
+```
+
+
+
+```{r}
+mean(train$WageNew[is.na(train$Club)])
+mean(train$WageNew[!is.na(train$Club)])
+```
+# We can see that the mean wage of missing values (of club) is much lower than the mean wage of the other players, so we put all missing valules into a new category.
+
+```{r}
+# Club
+levels(train$Club) <- c(levels(train$Club), "Non-exist")
+train$Club[is.na(train$Club)] <- "Non-exist"
+result <- numeric(0)
+for(l in levels(train$Club)){
+  result <- c(result, with(train, mean(WageNew[Club == l])))
+}
+names(result) <- levels(train$Club)
+
+# International.Reputation
+index <- c("one", "two", "three", "four", "five")
+train$International.Reputation <- as.factor(index[train$International.Reputation])
+levels(train$International.Reputation) <- c(levels(train$International.Reputation), "Non-exist")
+train$International.Reputation[is.na(train$International.Reputation)] <- "Non-exist"
+result <- numeric(0)
+for(l in levels(train$International.Reputation)){
+  result <- c(result, with(train, mean(WageNew[International.Reputation == l])))
+}
+names(result) <- levels(train$International.Reputation)
+
+#Reactions
+na_wage <- mean(train$WageNew[is.na(train$Reactions)])
+not_na_wage <- mean(train$WageNew[!is.na(train$Reactions)])
+
+not_na_means <- mean(train$Reactions[!is.na(train$Reactions)])
+train$Reactions[is.na(train$Reactions)] <- not_na_means * not_na_wage / na_wage
+
+#Composure
+na_wage <- mean(train$WageNew[is.na(train$Composure)])
+not_na_wage <- mean(train$WageNew[!is.na(train$Composure)])
+
+not_na_means <- mean(train$Composure[!is.na(train$Composure)])
+train$Composure[is.na(train$Composure)] <- not_na_means * not_na_wage / na_wage
+
+#BallControl
+na_wage <- mean(train$WageNew[is.na(train$BallControl)])
+not_na_wage <- mean(train$WageNew[!is.na(train$BallControl)])
+
+not_na_means <- mean(train$BallControl[!is.na(train$BallControl)])
+train$BallControl[is.na(train$BallControl)] <- not_na_means * not_na_wage / na_wage
+
+#ShortPassing
+na_wage <- mean(train$WageNew[is.na(train$ShortPassing)])
+not_na_wage <- mean(train$WageNew[!is.na(train$ShortPassing)])
+
+not_na_means <- mean(train$ShortPassing[!is.na(train$ShortPassing)])
+train$ShortPassing[is.na(train$ShortPassing)] <- not_na_means * not_na_wage / na_wage
+
+#Vision
+na_wage <- mean(train$WageNew[is.na(train$Vision)])
+not_na_wage <- mean(train$WageNew[!is.na(train$Vision)])
+
+not_na_means <- mean(train$Vision[!is.na(train$Vision)])
+train$Vision[is.na(train$Vision)] <- not_na_means * not_na_wage / na_wage
+
+#LongShots
+na_wage <- mean(train$WageNew[is.na(train$LongShots)])
+not_na_wage <- mean(train$WageNew[!is.na(train$LongShots)])
+
+not_na_means <- mean(train$LongShots[!is.na(train$LongShots)])
+train$LongShots[is.na(train$LongShots)] <- not_na_means * not_na_wage / na_wage
+```
+
+
+# Next recode "Club" variable
+```{r}
+# Club
+train$Club[is.na(train$Club)] <- "Non-exist"
+
+result <- numeric(0)
+
+for(l in unique(train$Club)){
+  result <- c(result, mean(train[train$Club==l,]$WageNew))
+}
+
+result <- setNames(result,unique(train$Club))
+
+result <- sort(result, decreasing = T)
+
+length(result)
+
+hist(result, nclass = 50)
+
+Group1 <- names(result[1:3])
+
+Group2 <- names(result[4:16])
+
+Group3 <- names(result[17:188]
+                [result[17:188]>quantile(result[17:188], 0.5)])
+
+Group4 <- names(result[result<=quantile(result[17:188], 0.5)&result>10000])
+
+Group5 <- names(result[result<=10000])
+
+train["Group1"] <- ifelse(train$Club %in% Group1, "Yes", "No")
+
+train["Group2"] <- ifelse(train$Club %in% Group2, "Yes", "No")
+
+train["Group3"] <- ifelse(train$Club %in% Group3, "Yes", "No")
+
+train["Group4"] <- ifelse(train$Club %in% Group4, "Yes", "No")
+
+train["Group5"] <- ifelse(train$Club %in% Group5, "Yes", "No")
+
+train$group <- NA
+train[train$Group1 == "Yes", 'group'] <- "Group1"
+train[train$Group2 == "Yes", 'group'] <- "Group2"
+train[train$Group3 == "Yes", 'group'] <- "Group3"
+train[train$Group4 == "Yes", 'group'] <- "Group4"
+train[train$Group5 == "Yes", 'group'] <- "Group5"
+
+# train$Group1 <- NULL
+# train$Group2 <- NULL
+# train$Group3 <- NULL
+# train$Group4 <- NULL
+# train$Group5 <- NULL
+```
+
+ 
+```{r}
+# Club
+levels(test$Club) <- c(levels(test$Club), "Non-exist")
+test$Club[is.na(test$Club)] <- "Non-exist"
+result <- numeric(0)
+
+# International.Reputation
+index <- c("one", "two", "three", "four", "five")
+test$International.Reputation <- as.factor(index[test$International.Reputation])
+levels(test$International.Reputation) <- c(levels(test$International.Reputation), "Non-exist")
+test$International.Reputation[is.na(test$International.Reputation)] <- "Non-exist"
+result <- numeric(0)
+
+#Reactions
+na_wage <- mean(train$WageNew[is.na(test$Reactions)])
+not_na_wage <- mean(train$WageNew[!is.na(test$Reactions)])
+
+not_na_means <- mean(test$Reactions[!is.na(test$Reactions)])
+test$Reactions[is.na(test$Reactions)] <- not_na_means * not_na_wage / na_wage
+
+#Composure
+na_wage <- mean(train$WageNew[is.na(test$Composure)])
+not_na_wage <- mean(train$WageNew[!is.na(test$Composure)])
+
+not_na_means <- mean(test$Composure[!is.na(test$Composure)])
+test$Composure[is.na(test$Composure)] <- not_na_means * not_na_wage / na_wage
+
+#BallControl
+na_wage <- mean(train$WageNew[is.na(test$BallControl)])
+not_na_wage <- mean(train$WageNew[!is.na(test$BallControl)])
+
+not_na_means <- mean(test$BallControl[!is.na(test$BallControl)])
+test$BallControl[is.na(test$BallControl)] <- not_na_means * not_na_wage / na_wage
+
+#ShortPassing
+na_wage <- mean(train$WageNew[is.na(test$ShortPassing)])
+not_na_wage <- mean(train$WageNew[!is.na(test$ShortPassing)])
+
+not_na_means <- mean(test$ShortPassing[!is.na(test$ShortPassing)])
+test$ShortPassing[is.na(test$ShortPassing)] <- not_na_means * not_na_wage / na_wage
+
+#Vision
+na_wage <- mean(train$WageNew[is.na(test$Vision)])
+not_na_wage <- mean(train$WageNew[!is.na(test$Vision)])
+
+not_na_means <- mean(test$Vision[!is.na(test$Vision)])
+train$Vision[is.na(test$Vision)] <- not_na_means * not_na_wage / na_wage
+
+#LongShots
+na_wage <- mean(train$WageNew[is.na(test$LongShots)])
+not_na_wage <- mean(train$WageNew[!is.na(test$LongShots)])
+
+not_na_means <- mean(test$LongShots[!is.na(test$LongShots)])
+test$LongShots[is.na(test$LongShots)] <- not_na_means * not_na_wage / na_wage
+```
+
+
+# Next recode "Club" variable
+```{r}
+test["Group1"] <- ifelse(test$Club %in% Group1, "Yes", "No")
+
+test["Group2"] <- ifelse(test$Club %in% Group2, "Yes", "No")
+
+test["Group3"] <- ifelse(test$Club %in% Group3, "Yes", "No")
+
+test["Group4"] <- ifelse(test$Club %in% Group4, "Yes", "No")
+
+test["Group5"] <- ifelse(test$Club %in% Group5, "Yes", "No")
+
+test$group <- NA
+test[test$Group1 == "Yes", 'group'] <- "Group1"
+test[test$Group2 == "Yes", 'group'] <- "Group2"
+test[test$Group3 == "Yes", 'group'] <- "Group3"
+test[test$Group4 == "Yes", 'group'] <- "Group4"
+test[test$Group5 == "Yes", 'group'] <- "Group5"
+
+# test$Group1 <- NULL
+# test$Group2 <- NULL
+# test$Group3 <- NULL
+# test$Group4 <- NULL
+# test$Group5 <- NULL
+```
+
+```{r}
+lm1 <- lm(WageNew ~ Overall+Potential+Reactions+Composure+BallControl+
+             ShortPassing+Vision+LongShots, data = train)
+summary(powerTransform(cbind(WageNew, Overall, Potential, Reactions, 
+                             Composure, BallControl, ShortPassing, Vision, LongShots) ~ 1, data = train))
+```
+
+```{r}
+inverseResponsePlot(lm1)
+```
+
+```{r}
+opt.subset.all <- regsubsets(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + 
+                                       I(Reactions^2) + I(Composure^2) +
+                                       I(BallControl^2) + I(ShortPassing^2) +
+                                        I(Vision^1.5) + LongShots + group + International.Reputation, data =train, method = "exhaustive")
+all.model.summary <- summary(opt.subset.all)
+
+all.model.summary
+print("adjr2")
+coef(opt.subset.all, which.max(all.model.summary$adjr2))
+print("bic")
+coef(opt.subset.all, which.min(all.model.summary$bic))
+```
+
+# suggested by regsubset
+```{r}
+lm2 <- lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + I(BallControl^2) + 
+             I(ShortPassing^2) + group + International.Reputation,
+          data = train)
+summary(lm2)
+vif(lm2)
+```
+
+# fixing multicollinearity by removing shortpassing
+```{r}
+lm3 <- lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + I(BallControl^2) + 
+              group + International.Reputation,
+          data = train)
+vif(lm3)
+```
+
+# fixing multicollinearity by removing international.reputation
+```{r}
+lm4 <- lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + I(BallControl^2) + 
+              group,
+          data = train)
+summary(lm4)
+vif(lm4)
+par(mfrow = c(2,2))
+#plot(lm4)
+anova(lm4)
+```
+
+# anova suggests ballcontrol is not significant, try removing it
+```{r}
+lm4_fix <- lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + 
+              group,
+          data = train)
+anova(lm4_fix, lm4)
+summary(lm4_fix)
+vif(lm4_fix)
+```
+# We get a similar R^2 with lm4_fix, so we use lm4_fix.
+
+# Try forwardAIC
+```{r}
+mint <- lm(log(WageNew)~1, data = train)
+forwardAIC <- step(mint, scope = list(lower=~1,
+                                     upper=~I(Overall^2.5) + I(Potential^0.75) + 
+                                       I(Reactions^2) + I(Composure^2) +
+                                       I(BallControl^2) + I(ShortPassing^2) +
+                                        I(Vision^1.5) + LongShots + group + 
+                                        International.Reputation), direction = "forward", data = train)
+```
+
+```{r}
+summary(forwardAIC)
+vif(forwardAIC)
+```
+
+
+```{r}
+mint <- lm(log(WageNew)~1, data = train)
+forwardBIC <- step(mint, scope = list(lower=~1,
+                                     upper=~I(Overall^2.5) + I(Potential^0.75) + 
+                                       I(Reactions^2) + I(Composure^2) +
+                                       I(BallControl^2) + I(ShortPassing^2) +
+                                        I(Vision^1.5) + LongShots + group + International.Reputation), direction = "forward", data = train, k = log(nrow(train)))
+summary(forwardBIC)
+vif(forwardBIC)
+```
+
+# There's multicollinearity in both forwardAIC and forwardBIC
+
+# BackwardBIC
+```{r}
+lmnew <- lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + 
+                                       I(Reactions^2) + I(Composure^2) +
+                                       I(BallControl^2) + I(ShortPassing^2) +
+                                        I(Vision^1.5) + LongShots + group + International.Reputation, data = train)
+backBIC <- step(lmnew, direction="backward", data = train, k = log(nrow(train)))
+
+summary(backBIC)
+vif(backBIC)
+```
+
+# Models suggested by forwardBIC and backwardBIC are the same, and there's multicollinearity.
+
+# fixing multicollinearity by removing Ballcontrol
+```{r}
+lm5 <- lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + I(Reactions^2) + 
+             I(ShortPassing^2) + LongShots + group, data = train)
+vif(lm5)
+```
+
+# fixing multicollinearity by removing shortpassing
+```{r}
+lm6 <- lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + I(Reactions^2) + 
+              LongShots + group, data = train)
+vif(lm6)
+anova(lm6)
+```
+
+# anova suggests that reactions is not significant, so we try removing it
+```{r}
+lm7 <- lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + 
+              LongShots + group, data = train)
+vif(lm7)
+anova(lm7)
+summary(lm7)
+par(mfrow = c(2,2))
+plot(lm7)
+```
+
+# The diagnostic plots of lm7 look similar to lm4_fix, but it has slightly higher R^2, so we use lm7.
+
+# remove bad leverage points
+```{r}
+leverage <- hatvalues(lm7)
+train <- train[-which(abs(rstandard(lm7)) >= 2 & leverage >= (2 * (7+1)/nrow(train))),]
+```
+
+```{r}
+lm8 <- lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75) + 
+              LongShots + group, data = train)
+summary(lm8)
+par(mfrow = c(2,2))
+plot(lm8)
+anova(lm8)
+```
+
+# Not much improvement
+
+```{r, warning = FALSE}
+mmps(lm(log(WageNew) ~ I(Overall^2.5) + I(Potential^0.75)
+              , data = train))
+```
+
+```{r}
+leveragePlots(lm8)
+```
+
+```{r}
+lm9 <- lm(log(WageNew) ~ I(Overall^2.5) + 
+              I(Potential^0.75) + group, data = train)
+summary(lm9)
+anova(lm9)
+vif(lm9)
+par(mfrow = c(2,2))
+plot(lm9)
+```
+
+# Not much change by removing potential
+
+
+```{r}
+leveragePlots(lm9)
+```
+
+```{r}
+lm10 <- lm(log(WageNew) ~ I(Overall^2.5) + 
+           group, data = train)
+summary(lm10)
+anova(lm9, lm10)
+```
+
+# After removing LongShots, R^2 dropped and partial F-test suggests not removing LongShots, so we keep it.
+# Therefore, the final model is lm9!
+```{r}
+summary(lm9)
+vif(lm9)
+par(mfrow = c(2,2))
+plot(lm9)
+```
+
+#actual predict
+```{r}
+WageNew <- exp(predict(lm9, test))
+Ob <- c(1:5462)
+sol <- cbind(Ob, WageNew)
+
+write.csv(sol, "sol.csv", row.names = FALSE)
+```
+
+
+Leverage and outlier
+```{r}
+leverage <- hatvalues(lm9)
+bad_leverage_points <- which(abs(rstandard(lm9))>2 & leverage >= 2*(3+1)/nrow(train))
+names(bad_leverage_points) <- NULL
+bad_leverage_points
+```
+
+```{r}
+scatterplotMatrix(~I(Overall^2.5) + I(Potential^0.75), data=train)
+```
+
+```{r}
+data <- data.frame("Potential^0.75" = train$Potential^0.75, "Overall^2.5" = train$Overall^2.5)
+cordata <- round(cor(data, use = "pairwise.complete.obs"), 4)
+corrplot(cordata, order = "AOE", method = "circle", cl.cex = 0.5, tl.cex=0.5)
+```
